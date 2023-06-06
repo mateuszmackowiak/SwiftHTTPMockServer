@@ -1,28 +1,20 @@
-// swift-tools-version: 5.8
+// swift-tools-version:5.5
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "MockServer",
-    products: [
-        // Products define the executables and libraries a package produces, and make them visible to other packages.
-        .library(
-            name: "MockServer",
-            targets: ["MockServer"]),
-    ],
+    name: "HTTPMockServer",
+    products: [ .library(name: "HTTPMockServer", targets: ["HTTPMockServer"]) ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.27.0")
     ],
     targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
-            name: "MockServer",
-            dependencies: []),
+            name: "HTTPMockServer",
+            dependencies: [ .product(name: "NIOHTTP2", package: "swift-nio-http2") ]),
         .testTarget(
-            name: "MockServerTests",
-            dependencies: ["MockServer"]),
+            name: "HTTPMockServerTests",
+            dependencies: ["HTTPMockServer"]),
     ]
 )
