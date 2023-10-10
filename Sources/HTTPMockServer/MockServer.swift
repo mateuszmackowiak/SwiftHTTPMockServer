@@ -17,16 +17,19 @@ public final class MockServer {
         }
     }
 
-    private lazy var group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    private lazy var group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     public static var configuration = Configuration()
 
     public let host: String
     public let port: Int
     public var stubs: [ServerStub]
     public let unhandledBlock: (HTTPRequest) -> Void
+    public var baseURL: URL {
+        URL(string: "http://\(host):\(port)")!
+    }
 
-    public init(host: String = "localhost",
-                port: Int = 8888,
+    public init(host: String = "127.0.0.1",
+                port: Int = .random(in: 6000...8000),
                 stubs: [ServerStub],
                 unhandledBlock: @escaping (HTTPRequest) -> Void = { print("Unhandled \($0)") }) {
         self.host = host
@@ -37,6 +40,7 @@ public final class MockServer {
 
     lazy var serverBootstrap: ServerBootstrap = {
         let stubs = self.stubs + Self.configuration.basicStubs
+        let baseURL = baseURL
         let unhandledBlock = self.unhandledBlock
         return ServerBootstrap(group: group)
         .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -44,7 +48,7 @@ public final class MockServer {
         .childChannelInitializer { channel in
             return channel.pipeline.configureHTTPServerPipeline().flatMap {
                 return channel.pipeline.addHandlers([
-                    HTTPRequestPartDecoder(),
+                    HTTPRequestPartDecoder(baseURL: baseURL),
                     StubHandler(stubs: stubs,
                                 logger: Self.configuration.logger,
                                 unhandledBlock: unhandledBlock)])

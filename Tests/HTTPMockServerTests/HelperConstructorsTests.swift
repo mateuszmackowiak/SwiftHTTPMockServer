@@ -24,7 +24,7 @@ final class HelperConstructorsTests: XCTestCase {
     }
 
     func testConstructorMockServer() async throws {
-        let request = URLRequest(url: URL(string: "http://localhost:\(server.port)/test")!)
+        let request = URLRequest(url: server.baseURL.appendingPathComponent("/test"))
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

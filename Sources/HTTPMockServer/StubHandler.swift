@@ -40,10 +40,13 @@ final class StubHandler: ChannelInboundHandler {
                     httpHeaders.add(name: $0.key, value: $0.value)
                 }
                 responseContentType = contentType
-            case .failure(let statusCode, let error):
-                responseBodyData = try! JSONEncoder().encode(error)
+            case .failure(let statusCode, let body, let headers):
+                responseBodyData = body
                 status = statusCode
                 responseContentType = "application/json"
+                headers.forEach {
+                    httpHeaders.add(name: $0.key, value: $0.value)
+                }
             }
 
             httpHeaders.add(name: "Content-Length", value: "\(responseBodyData.count)")

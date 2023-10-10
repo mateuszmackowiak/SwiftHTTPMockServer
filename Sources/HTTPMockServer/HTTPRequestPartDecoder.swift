@@ -5,6 +5,7 @@
 
 import NIO
 import NIOHTTP1
+import Foundation
 
 final class HTTPRequestPartDecoder: ChannelInboundHandler {
     typealias InboundIn = HTTPServerRequestPart
@@ -30,9 +31,12 @@ final class HTTPRequestPartDecoder: ChannelInboundHandler {
     /// Maximum body size allowed per request.
     private let maxBodySize: Int
 
-    init(maxBodySize: Int = 1_000_000) {
+    let baseURL: URL
+
+    init(maxBodySize: Int = 1_000_000, baseURL: URL) {
         self.maxBodySize = maxBodySize
         self.requestState = .ready
+        self.baseURL = baseURL
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -73,6 +77,6 @@ final class HTTPRequestPartDecoder: ChannelInboundHandler {
     }
 
     private func fireRequestRead(head: HTTPRequestHead, body: HTTPBody, context: ChannelHandlerContext) {
-        context.fireChannelRead(wrapInboundOut(HTTPRequest(method: head.method, uri: head.uri, version: head.version, headers: head.headers, body: body)))
+        context.fireChannelRead(wrapInboundOut(HTTPRequest(method: head.method, uri: head.uri, version: head.version, headers: head.headers, body: body, baseURL: baseURL)))
     }
 }

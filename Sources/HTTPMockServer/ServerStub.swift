@@ -7,10 +7,10 @@ import Foundation
 import NIOHTTP1
 
 public struct ResponseError: Encodable, Hashable {
-    public let code: String
+    public let code: String?
     public let message: String
 
-    public init(code: String, message: String) {
+    public init(code: String? = nil, message: String) {
         self.code = code
         self.message = message
     }
@@ -19,13 +19,15 @@ public struct ResponseError: Encodable, Hashable {
 open class ServerStub {
     public enum Response: Hashable {
         case success(responseBody: Data, statusCode: HTTPResponseStatus = .ok, contentType: String = "application/json", headers: [String: String] = [:])
-        case failure(statusCode: HTTPResponseStatus, responseError: ResponseError)
+        case failure(statusCode: HTTPResponseStatus, responseBody: Data, headers: [String: String] = [:])
+
+
         
         public init(catching body: () throws -> Data) {
             do {
                 self = .success(responseBody: try body(), statusCode: .ok)
             } catch {
-                self = .failure(statusCode: .badRequest, responseError: ResponseError(code: "\((error as NSError).domain)_\((error as NSError).code)", message: String(describing: error)))
+                self = .failure(statusCode: .badRequest, response: ResponseError(code: "\((error as NSError).domain)_\((error as NSError).code)", message: String(describing: error)))
             }
         }
         
@@ -36,12 +38,23 @@ open class ServerStub {
             let data = try! JSONEncoder().encode(response)
             return .success(responseBody: data, statusCode: statusCode, contentType: contentType, headers: headers)
         }
+
+        public static func failure<T: Encodable>(statusCode: HTTPResponseStatus,
+                                                 response: T,
+                                                 headers: [String: String] = [:]) -> Response {
+            let data = try! JSONEncoder().encode(response)
+            return .failure(statusCode: statusCode, responseBody: data, headers: headers)
+        }
+
+        public static func failure(statusCode: HTTPResponseStatus, responseError: ResponseError, headers: [String: String] = [:]) -> Response {
+            .failure(statusCode: statusCode, response: responseError, headers: headers)
+        }
     }
     
     public var matchingRequest: (HTTPRequest) -> Bool
     public var handler: (HTTPRequest) -> Response?
     
-    /// Return `nil` response if You don't want to handle the request.
+    /// Return `nil` response if You don't want to handle the request. 
     public init(matchingRequest: @escaping (HTTPRequest) -> Bool, handler: @escaping (HTTPRequest) -> Response?) {
         self.matchingRequest = matchingRequest
         self.handler = handler
@@ -77,7 +90,7 @@ public extension ServerStub {
                      failing statusCode: @escaping @autoclosure () -> HTTPResponseStatus,
                      responseError: @escaping @autoclosure () -> ResponseError = ResponseError(code: UUID().uuidString, message: UUID().uuidString)) {
         self.init(matchingRequest: matchingRequest,
-                  handler: { _ in .failure(statusCode: statusCode(), responseError: responseError()) })
+                  handler: { _ in .failure(statusCode: statusCode(), response: responseError()) })
     }
 }
 

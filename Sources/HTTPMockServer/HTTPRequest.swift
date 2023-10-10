@@ -18,13 +18,15 @@ public struct HTTPRequest {
     public let version: HTTPVersion
     public let headers: HTTPHeaders
     public let body: HTTPBody
+    public let baseURL: URL
 
-    public init(method: HTTPMethod, uri: String, version: HTTPVersion, headers: HTTPHeaders, body: HTTPBody) {
+    public init(method: HTTPMethod, uri: String, version: HTTPVersion, headers: HTTPHeaders, body: HTTPBody, baseURL: URL) {
         self.method = method
         self.uri = uri
         self.version = version
         self.headers = headers
         self.body = body
+        self.baseURL = baseURL
     }
 }
 
