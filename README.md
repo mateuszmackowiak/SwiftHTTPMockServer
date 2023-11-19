@@ -3,9 +3,6 @@
 Swift-nio based server for mocking
 
 [![iOS](https://img.shields.io/badge/iOS->12.0-green.svg)](https://developer.apple.com/ios/)
-[![macOS](https://img.shields.io/badge/iOS->10.15-green.svg)](https://developer.apple.com/macos/)
-[![watchOS](https://img.shields.io/badge/watchOS->4-green.svg)](https://developer.apple.com/watchos/)
-[![tvOS](https://img.shields.io/badge/watchOS->11-green.svg)](https://developer.apple.com/tvos/)
 
 ```swift 
 
