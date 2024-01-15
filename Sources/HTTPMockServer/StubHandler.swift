@@ -48,6 +48,7 @@ final class StubHandler: ChannelInboundHandler {
                     httpHeaders.add(name: $0.key, value: $0.value)
                 }
             }
+            stub.history.append(response)
 
             httpHeaders.add(name: "Content-Length", value: "\(responseBodyData.count)")
             httpHeaders.add(name: "Content-Type", value: responseContentType)

@@ -9,13 +9,15 @@ import HTTPMockServer
 final class HTTPServerTests: XCTestCase {
     private lazy var location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
     private lazy var url = URL(string: "http://localhost:\(server.port)/testHTTPServerTests")!
+    private lazy var stub = TestLocationServerStub(self.location)
 
     private lazy var server = MockServer(port: .random(in: 7000...8000), stubs: [
         .requestBearerAuthorizationValidator,
         .requestContentTypeValidator,
-        TestLocationServerStub(self.location)], unhandledBlock: {
-            XCTFail("Unhandled request \($0)")
-        })
+        stub
+    ], unhandledBlock: {
+        XCTFail("Unhandled request \($0)")
+    })
 
     override func setUpWithError() throws {
         try server.start()
@@ -34,16 +36,19 @@ final class HTTPServerTests: XCTestCase {
         request.allHTTPHeaderFields = headers
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        XCTAssertEqual(data, Data("""
+        let expectedData = Data("""
         {
           "location": {
             "coordinates": [\(location.latitude), \(location.longitude)],
             "type": "Point"
           }
         }
-        """.utf8))
+        """.utf8)
+        XCTAssertEqual(data, expectedData)
         let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
         XCTAssertEqual(httpResponse.statusCode, 200)
+
+        XCTAssertEqual(stub.responseHistory, [.success(responseBody: expectedData)])
     }
 
     func testMissingAuthorizationHeader() async throws {

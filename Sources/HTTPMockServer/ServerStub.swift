@@ -17,6 +17,11 @@ public struct ResponseError: Encodable, Hashable {
 }
 
 open class ServerStub {
+    internal var history = [Response]()
+    public var responseHistory: [Response] {
+        history
+    }
+
     public enum Response: Hashable {
         case success(responseBody: Data, statusCode: HTTPResponseStatus = .ok, contentType: String = "application/json", headers: [String: String] = [:])
         case failure(statusCode: HTTPResponseStatus, responseBody: Data, headers: [String: String] = [:])
