@@ -3,107 +3,107 @@
 //  Created by Mateusz
 //
 
-import XCTest
+import Foundation
+import Testing
 import HTTPMockServer
 
-final class HTTPServerTests: XCTestCase {
-    private lazy var location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
-    private lazy var url = URL(string: "http://localhost:\(server.port)/testHTTPServerTests")!
+@Suite
+final class HTTPServerTests {
+    private struct ResponseError: Decodable, Hashable {
+        let code: String
+        let message: String
+    }
+    
+    private let location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
     private lazy var stub = TestLocationServerStub(self.location)
-
+    private lazy var url = server.baseURL.appending(path: "testHTTPServerTests")
     private lazy var server = MockServer(port: .random(in: 7000...8000), stubs: [
         .requestBearerAuthorizationValidator,
         .requestContentTypeValidator,
         stub
-    ], unhandledBlock: {
-        XCTFail("Unhandled request \($0)")
+    ], unhandledBlock: { head in
+        Issue.record("Unhandled request \(head)")
     })
-
-    override func setUpWithError() throws {
+    init() throws {
         try server.start()
-        try super.setUpWithError()
     }
-
-    override func tearDownWithError() throws {
-        try server.stop()
-        try super.tearDownWithError()
+    
+    deinit {
+        try! server.stop()
     }
-
+    
+    
+    @Test("GET succeeds with valid headers and body matches expected JSON")
     func testSimpleSuccess() async throws {
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        let headers = ["authorization": "Bearer \(UUID().uuidString)", "Content-Type": "application/json"]
-        request.allHTTPHeaderFields = headers
-
+        request.allHTTPHeaderFields = ["authorization": "Bearer \(UUID().uuidString)", "Content-Type": "application/json"]
+        
         let (data, response) = try await URLSession.shared.data(for: request)
         let expectedData = Data("""
         {
           "location": {
-            "coordinates": [\(location.latitude), \(location.longitude)],
+            "coordinates": [\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))],
             "type": "Point"
           }
         }
         """.utf8)
-        XCTAssertEqual(data, expectedData)
-        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
-        XCTAssertEqual(httpResponse.statusCode, 200)
-
-        XCTAssertEqual(stub.responseHistory, [.success(responseBody: expectedData)])
+        #expect(data == expectedData)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 200)
+        
+        #expect(stub.responseHistory == [.success(responseBody: expectedData)])
     }
-
+    
+    @Test("403 when Authorization header missing")
     func testMissingAuthorizationHeader() async throws {
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-
+        let request = URLRequest(url: url)
+        
         let (data, response) = try await URLSession.shared.data(for: request)
-
+        
         let responseStruct = try JSONDecoder().decode(ResponseError.self, from: data)
-        XCTAssertEqual(responseStruct.code, "Missing Authorisation Bearer header")
-        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
-        XCTAssertEqual(httpResponse.statusCode, 403)
+        #expect(responseStruct.code == "Missing Authorisation Bearer header")
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 403)
     }
-
+    
+    
+    @Test("400 when Content-Type header missing")
     func testMissingContentTypeHeader() async throws {
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
         request.allHTTPHeaderFields = ["authorization": "Bearer \(UUID().uuidString)"]
-
+        
         let (data, response) = try await URLSession.shared.data(for: request)
-
+        
         let responseStruct = try JSONDecoder().decode(ResponseError.self, from: data)
-        XCTAssertEqual(responseStruct.code, "Missing Content-Type header")
-        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
-        XCTAssertEqual(httpResponse.statusCode, 400)
+        #expect(responseStruct.code == "Missing Content-Type header")
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 400)
     }
-
+    
+    @Test("200 when both headers provided")
     func testSuccessResponse() async throws {
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
         request.allHTTPHeaderFields = ["authorization": "Bearer \(UUID().uuidString)", "Content-Type": "application/json"]
-
+        
         let (data, response) = try await URLSession.shared.data(for: request)
-        XCTAssertEqual(data, Data("""
+        let expectedData = Data("""
         {
           "location": {
-            "coordinates": [\(location.latitude), \(location.longitude)],
+            "coordinates": [\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))],
             "type": "Point"
           }
         }
-        """.utf8))
-        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
-        XCTAssertEqual(httpResponse.statusCode, 200)
-    }
-
-    private struct ResponseError: Decodable, Hashable {
-        let code: String
-        let message: String
+        """.utf8)
+        #expect(data == expectedData)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 200)
     }
 }
 
 extension ServerStub {
     static let requestBearerAuthorizationValidator = RequestBearerAuthorizationValidator()
     static let requestContentTypeValidator = RequestContentTypeValidator()
-
+    
     final class RequestBearerAuthorizationValidator: ServerStub {
         init() {
             super.init(matchingRequest: { _ in true }) {
@@ -115,13 +115,13 @@ extension ServerStub {
             }
         }
     }
-
+    
     final class RequestContentTypeValidator: ServerStub {
         public let supportedTypes: [String]
-
+        
         init(supportedTypes: [String] = ["application/json", "multipart/form-data"]) {
             self.supportedTypes = supportedTypes
-
+            
             super.init(matchingRequest: { _ in true }) { head in
                 if let header = head.headers["Content-Type"].first {
                     for supportedType in supportedTypes {
@@ -145,7 +145,7 @@ fileprivate class TestLocationServerStub: ServerStub {
             return .success(responseBody: Data("""
            {
              "location": {
-               "coordinates": [\(location.latitude), \(location.longitude)],
+               "coordinates": [\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))],
                "type": "Point"
              }
            }

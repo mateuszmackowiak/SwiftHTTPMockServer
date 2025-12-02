@@ -7,7 +7,7 @@ let package = Package(
     name: "HTTPMockServer",
     products: [ .library(name: "HTTPMockServer", targets: ["HTTPMockServer"]) ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.27.0")
+        .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.39.0")
     ],
     targets: [
         .target(
