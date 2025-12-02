@@ -15,13 +15,16 @@ UI tests in pure Swift:
 
 
 ##UI Tests
-```
-import Testing
-import HTTPMockServer
 
-let app = XCUIApplication()
-app.launchEnvironment["MOCK_SERVER_BASE_URL"] = server.baseURL.absoluteString
-app.launch()
+```swift
+  let stub = ServerStub(uri: "/hello", returning: ["ok": true])
+  let server = MockServer(stubs: [stub]) { Issue.record("Unhandled \($0)") }
+  try server.start(); defer { try? server.stop() }
+
+  // In UI tests:
+  let app = XCUIApplication()
+  app.launchEnvironment["MOCK_SERVER_BASE_URL"] = server.baseURL.absoluteString
+  app.launch()
 ```
 
 
