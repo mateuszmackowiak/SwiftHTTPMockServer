@@ -3,6 +3,8 @@
 //  Created by Mateusz
 //
 
+#if canImport(Testing)
+
 import Foundation
 import Testing
 import HTTPMockServer
@@ -190,3 +192,5 @@ final class Tests {
         #expect(httpResponse.statusCode ==  200)
     }
 }
+
+#endif

@@ -3,6 +3,7 @@
 //  Created by Mateusz
 //
 
+#if canImport(Testing)
 import Testing
 import Foundation
 import HTTPMockServer
@@ -75,3 +76,4 @@ class Helper2ConstructorsTests {
         #expect(httpResponse.statusCode == 200)
     }
 }
+#endif

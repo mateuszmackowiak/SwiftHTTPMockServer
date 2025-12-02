@@ -2,13 +2,12 @@
 //
 //  Created by Mateusz
 //
+#if canImport(XCTest)
 
-import Foundation
-import Testing
+import XCTest
 import HTTPMockServer
 
-@Suite
-final class POSTTests {
+final class POSTTests: XCTestCase {
     private lazy var postTestStub = ServerStub(matchingRequest: { $0.method == .POST }, handler: {
         guard let data = $0.body.data else {
             return .failure(statusCode: .badRequest, responseError: ResponseError(code: "Incomplete data", message: "Incomplete data \($0)"))
@@ -16,18 +15,19 @@ final class POSTTests {
         return .success(responseBody: data, statusCode: .ok)
     })
     private lazy var server = MockServer(port: Int.random(in: 6000...8000), stubs: [postTestStub], unhandledBlock: { head in
-        Issue.record("Unhandled request \(head)")
+        XCTFail("Unhandled request \(head)")
     })
     
-    init() throws {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         try server.start()
     }
     
-    deinit {
-        try! server.stop()
+    override func tearDownWithError() throws {
+        try super.tearDownWithError()
+        try server.stop()
     }
 
-    @Test("POST echoes body and returns 200")
     func testPostToLocalhostMockServer() async throws {
         var request = URLRequest(url: server.baseURL.appending(path: "test"))
         request.httpMethod = "POST"
@@ -37,9 +37,9 @@ final class POSTTests {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         let responseStruct = try JSONDecoder().decode(TestStruct.self, from: data)
-        #expect(responseStruct == requestStruct)
-        let httpResponse = try #require(response as? HTTPURLResponse)
-        #expect(httpResponse.statusCode == 200)
+        XCTAssertEqual(responseStruct, requestStruct)
+        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
+        XCTAssertEqual(httpResponse.statusCode, 200)
     }
 
     private struct TestStruct: Codable, Hashable {
@@ -47,3 +47,5 @@ final class POSTTests {
         var id: UUID = UUID()
     }
 }
+
+#endif

@@ -29,15 +29,6 @@
         }
       },
       {
-        "package": "swift-nio-http2",
-        "repositoryURL": "https://github.com/apple/swift-nio-http2.git",
-        "state": {
-          "branch": null,
-          "revision": "c2ba4cfbb83f307c66f5a6df6bb43e3c88dfbf80",
-          "version": "1.39.0"
-        }
-      },
-      {
         "package": "swift-system",
         "repositoryURL": "https://github.com/apple/swift-system.git",
         "state": {

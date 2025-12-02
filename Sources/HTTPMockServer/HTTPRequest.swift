@@ -6,7 +6,6 @@
 import Foundation
 import NIO
 import NIOHTTP1
-import NIOHTTP2
 
 public typealias HTTPResponseStatus = NIOHTTP1.HTTPResponseStatus
 public typealias HTTPMethod = NIOHTTP1.HTTPMethod
