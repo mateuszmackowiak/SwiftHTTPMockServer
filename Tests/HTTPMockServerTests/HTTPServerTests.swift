@@ -107,7 +107,7 @@ extension ServerStub {
     static let requestBearerAuthorizationValidator = RequestBearerAuthorizationValidator()
     static let requestContentTypeValidator = RequestContentTypeValidator()
     
-    final class RequestBearerAuthorizationValidator: ServerStub {
+    final class RequestBearerAuthorizationValidator: ServerStub, @unchecked Sendable {
         init() {
             super.init(matchingRequest: { _ in true }) {
                 guard let authorizationHeader = ($0.headers["Authorization"].first ?? $0.headers["authorization"].first),
@@ -119,7 +119,7 @@ extension ServerStub {
         }
     }
     
-    final class RequestContentTypeValidator: ServerStub {
+    final class RequestContentTypeValidator: ServerStub, @unchecked Sendable {
         public let supportedTypes: [String]
         
         init(supportedTypes: [String] = ["application/json", "multipart/form-data"]) {
@@ -139,12 +139,11 @@ extension ServerStub {
     }
 }
 
-fileprivate class TestLocationServerStub: ServerStub {
-    public init(_ locationProvider: @escaping @autoclosure () -> (latitude: Double, longitude: Double)) {
+fileprivate class TestLocationServerStub: ServerStub, @unchecked Sendable {
+    public init(_ location: (latitude: Double, longitude: Double)) {
         super.init(matchingRequest: {
             $0.method == .GET && $0.uri == "/testHTTPServerTests"
-        }) { _ in
-            let location = locationProvider()
+        }, handler: { _ in
             return .success(responseBody: Data("""
            {
              "location": {
@@ -153,7 +152,7 @@ fileprivate class TestLocationServerStub: ServerStub {
              }
            }
            """.utf8))
-        }
+        })
     }
 }
 
@@ -194,3 +193,4 @@ final class Tests {
 }
 
 #endif
+

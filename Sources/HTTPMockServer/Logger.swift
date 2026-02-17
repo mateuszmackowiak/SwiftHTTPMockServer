@@ -3,7 +3,7 @@
 //  Created by Mateusz
 //
 
-public class PrintLogger: Logger {
+public final class PrintLogger: Logger {
     public init() {}
 
     public func log(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
@@ -13,7 +13,7 @@ public class PrintLogger: Logger {
     }
 }
 
-public protocol Logger {
+public protocol Logger: Sendable {
     func log(_ message: String, file: String, function: String, line: Int)
 }
 

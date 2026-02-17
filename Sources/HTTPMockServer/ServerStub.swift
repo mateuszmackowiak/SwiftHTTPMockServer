@@ -16,13 +16,14 @@ public struct ResponseError: Encodable, Hashable {
     }
 }
 
-open class ServerStub {
+open class ServerStub: @unchecked Sendable {
     internal var history = [Response]()
+    
     public var responseHistory: [Response] {
         history
     }
 
-    public enum Response: Hashable {
+    public enum Response: Hashable, Sendable {
         case success(responseBody: Data, statusCode: HTTPResponseStatus = .ok, contentType: String = "application/json", headers: [String: String] = [:])
         case failure(statusCode: HTTPResponseStatus, responseBody: Data, headers: [String: String] = [:])
 
@@ -56,44 +57,44 @@ open class ServerStub {
         }
     }
     
-    public var matchingRequest: (HTTPRequest) -> Bool
-    public var handler: (HTTPRequest) -> Response?
+    public var matchingRequest: @Sendable (HTTPRequest) -> Bool
+    public var handler: @Sendable (HTTPRequest) -> Response?
     
     /// Return `nil` response if You don't want to handle the request. 
-    public init(matchingRequest: @escaping (HTTPRequest) -> Bool, handler: @escaping (HTTPRequest) -> Response?) {
+    public init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool, handler: @Sendable @escaping (HTTPRequest) -> Response?) {
         self.matchingRequest = matchingRequest
         self.handler = handler
     }
 }
 
 public extension ServerStub {
-    convenience init(matchingRequest: @escaping (HTTPRequest) -> Bool,
-                     returningFileAt fileURL: @escaping @autoclosure () -> URL) {
+    convenience init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
+                     returningFileAt fileURL: @Sendable @escaping @autoclosure () -> URL) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in .success(responseBody: try! Data(contentsOf: fileURL())) })
     }
 
-    convenience init(matchingRequest: @escaping (HTTPRequest) -> Bool,
-                     returning data: @escaping @autoclosure () -> Data) {
+    convenience init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
+                     returning data: @Sendable @escaping @autoclosure () -> Data) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in .success(responseBody: data()) })
     }
 
-    convenience init(matchingRequest: @escaping (HTTPRequest) -> Bool,
-                     returning string: @escaping @autoclosure () -> String) {
+    convenience init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
+                     returning string: @Sendable @escaping @autoclosure () -> String) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in .success(responseBody: Data(string().utf8)) })
     }
 
-    convenience init<T: Encodable>(matchingRequest: @escaping (HTTPRequest) -> Bool,
-                                   returning response: @escaping @autoclosure () -> T) {
+    convenience init<T: Encodable>(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
+                                   returning response: @Sendable @escaping @autoclosure () -> T) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in Response(catching: { try JSONEncoder().encode(response()) }) })
     }
 
-    convenience init(matchingRequest: @escaping (HTTPRequest) -> Bool,
-                     failing statusCode: @escaping @autoclosure () -> HTTPResponseStatus,
-                     responseError: @escaping @autoclosure () -> ResponseError = ResponseError(code: UUID().uuidString, message: UUID().uuidString)) {
+    convenience init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
+                     failing statusCode: @Sendable @escaping @autoclosure () -> HTTPResponseStatus,
+                     responseError: @Sendable @escaping @autoclosure () -> ResponseError = ResponseError(code: UUID().uuidString, message: UUID().uuidString)) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in .failure(statusCode: statusCode(), response: responseError()) })
     }
@@ -101,21 +102,29 @@ public extension ServerStub {
 
 public extension ServerStub {
     convenience init(uri: String,
-                     returning string: @escaping @autoclosure () -> String) {
+                     returning string: @Sendable @escaping @autoclosure () -> String) {
         self.init(matchingRequest: { $0.uri == uri },
                   handler: { _ in .success(responseBody: Data(string().utf8)) })
     }
 
     convenience init(uri: String,
-                     returning data: @escaping @autoclosure () -> Data) {
+                     returning data: @Sendable @escaping @autoclosure () -> Data) {
         self.init(matchingRequest: { $0.uri == uri },
                   handler: { _ in .success(responseBody: data()) })
     }
 
     convenience init<T: Encodable>(uri: String,
-                                   returning response: @escaping @autoclosure () -> T,
+                                   returning response: @Sendable @escaping () -> T,
                                    jsonEncoder: JSONEncoder = .init()) {
         self.init(matchingRequest: { $0.uri == uri },
                   handler: { _ in Response(catching: { try jsonEncoder.encode(response()) }) })
+    }
+    
+    convenience init<T: Encodable>(uri: String,
+                                   returning response: T,
+                                   jsonEncoder: JSONEncoder = .init()) {
+        let response = Response(catching: { try jsonEncoder.encode(response) })
+        self.init(matchingRequest: { $0.uri == uri },
+                  handler: { _ in response })
     }
 }

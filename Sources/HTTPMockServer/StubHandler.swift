@@ -7,14 +7,14 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-final class StubHandler: ChannelInboundHandler {
+final class StubHandler: ChannelInboundHandler, Sendable {
     typealias InboundIn = HTTPRequest
     typealias InboundOut = HTTPServerResponsePart
     let logger: Logger?
     let stubs: [ServerStub]
-    let unhandledBlock: (HTTPRequest) -> Void
+    let unhandledBlock: @Sendable (HTTPRequest) -> Void
 
-    init(stubs: [ServerStub], logger: Logger?, unhandledBlock: @escaping (HTTPRequest) -> Void) {
+    init(stubs: [ServerStub], logger: Logger?, unhandledBlock: @Sendable @escaping (HTTPRequest) -> Void) {
         self.stubs = stubs
         self.logger = logger
         self.unhandledBlock = unhandledBlock
@@ -22,6 +22,7 @@ final class StubHandler: ChannelInboundHandler {
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let request = unwrapInboundIn(data)
+        let channel = context.channel
         for stub in stubs {
             guard stub.matchingRequest(request), let response = stub.handler(request) else {
                 continue
@@ -62,8 +63,8 @@ final class StubHandler: ChannelInboundHandler {
             context.writeAndFlush(wrapInboundOut(body), promise: nil)
 
             let endpart = HTTPServerResponsePart.end(nil)
-            _ = context.channel.writeAndFlush(endpart).flatMap {
-                context.channel.close()
+            _ = channel.writeAndFlush(endpart).flatMap {
+                channel.close()
             }
             return
         }
@@ -82,8 +83,8 @@ final class StubHandler: ChannelInboundHandler {
         let body = HTTPServerResponsePart.body(.byteBuffer(buffer))
         context.writeAndFlush(wrapInboundOut(body), promise: nil)
          let endpart = HTTPServerResponsePart.end(nil)
-        _ = context.channel.writeAndFlush(endpart).flatMap {
-            context.channel.close()
+        channel.writeAndFlush(endpart).whenComplete { _ in
+            channel.close(promise: nil)
         }
     }
 

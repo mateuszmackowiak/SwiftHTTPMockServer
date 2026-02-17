@@ -166,7 +166,7 @@ public struct HTTPBody: ExpressibleByStringLiteral {
     }
 
     /// An empty `HTTPBody`.
-    public static let empty: HTTPBody = .init()
+    nonisolated(unsafe) public static let empty: HTTPBody = .init()
 
     public var string: String? {
         switch self.storage {
@@ -241,7 +241,7 @@ public struct HTTPBody: ExpressibleByStringLiteral {
         }
     }
 
-    internal var storage: Storage
+    internal let storage: Storage
 
     /// Creates an empty body. Useful for `GET` requests where HTTP bodies are forbidden.
     public init() {

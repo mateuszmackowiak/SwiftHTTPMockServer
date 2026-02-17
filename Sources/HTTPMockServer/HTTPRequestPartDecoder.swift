@@ -7,7 +7,7 @@ import NIO
 import NIOHTTP1
 import Foundation
 
-final class HTTPRequestPartDecoder: ChannelInboundHandler {
+final class HTTPRequestPartDecoder: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = HTTPServerRequestPart
     typealias InboundOut = HTTPRequest
 
@@ -26,15 +26,12 @@ final class HTTPRequestPartDecoder: ChannelInboundHandler {
     }
 
     /// Current HTTP state.
-    var requestState: RequestState
-
-    /// Maximum body size allowed per request.
-    private let maxBodySize: Int
+    /// Modified only with a single EventLoop so @unchecked is fine :)
+    private(set) var requestState: RequestState
 
     let baseURL: URL
 
-    init(maxBodySize: Int = 1_000_000, baseURL: URL) {
-        self.maxBodySize = maxBodySize
+    init(baseURL: URL) {
         self.requestState = .ready
         self.baseURL = baseURL
     }
