@@ -10,6 +10,7 @@ import Testing
 import HTTPMockServer
 
 @Suite
+@MockServer
 final class HTTPServerTests {
     private struct ResponseError: Decodable, Hashable {
         let code: String
@@ -17,24 +18,11 @@ final class HTTPServerTests {
     }
     
     private let location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
-    private lazy var stub = TestLocationServerStub(self.location)
+    private lazy var stub = TestLocationServerStub(location)
+    
+    @Stub
+    private lazy var stubs = [ServerStub.requestBearerAuthorizationValidator, .requestContentTypeValidator, stub]
     private lazy var url = server.baseURL.appending(path: "testHTTPServerTests")
-    private lazy var server = MockServer(port: .random(in: 7000...8000), stubs: [
-        .requestBearerAuthorizationValidator,
-        .requestContentTypeValidator,
-        stub
-    ], unhandledBlock: { head in
-        Issue.record("Unhandled request \(head)")
-    })
-    
-    init() throws {
-        try server.start()
-    }
-    
-    deinit {
-        try! server.stop()
-    }
-    
     
     @Test("GET succeeds with valid headers and body matches expected JSON")
     func testSimpleSuccess() async throws {

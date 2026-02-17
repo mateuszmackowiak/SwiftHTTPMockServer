@@ -37,6 +37,7 @@ class HelperConstructorsTests {
 }
 
 @Suite("Helper2ConstructorsTests")
+@MockServer
 class Helper2ConstructorsTests {
     struct SampleStruct: Encodable, Equatable {
         let sample: String
@@ -49,21 +50,9 @@ class Helper2ConstructorsTests {
     }
 
     private var testResponse = SampleStruct()
-    private var testStub: ServerStub { ServerStub(uri: "/test", returning: self.testResponse) }
-
-    private var server: MockServer!
-
-    init() {
-        server = MockServer(port: Int.random(in: 6000...8000), stubs: [testStub], unhandledBlock: { request in
-            Issue.record("Unhandled request \(request)")
-        })
-        try! server.start()
-    }
-
-    deinit {
-        try! server.stop()
-    }
-
+    @Stub
+    private lazy var testStub = ServerStub(uri: "/test", returning: self.testResponse)
+    
     @Test("ConstructorMockServer returns JSON body and 200")
     func testConstructorMockServer() async throws {
         let request = URLRequest(url: server.baseURL.appending(path: "test"))
