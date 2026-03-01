@@ -12,7 +12,7 @@ import HTTPMockServer
 class HelperConstructorsTests {
     private var testStub: ServerStub { ServerStub(uri: "/test", returning: "testBody") }
 
-    private lazy var server = MockServer(port: Int.random(in: 6000...8000), stubs: [testStub], unhandledBlock: { request in
+    private lazy var server = MockServer(stubs: [testStub], unhandledBlock: { request in
         Issue.record("Unhandled request \(request)")
     })
 
@@ -36,10 +36,9 @@ class HelperConstructorsTests {
     }
 }
 
-@Suite("Helper2ConstructorsTests")
-@MockServer
+@MockServer(serverPropertyName: "mordo")
 class Helper2ConstructorsTests {
-    struct SampleStruct: Encodable, Equatable {
+    struct SampleStruct: Codable, Equatable {
         let sample: String
         let data: Date
 
@@ -48,20 +47,33 @@ class Helper2ConstructorsTests {
             self.data = data
         }
     }
-
+    @Stub(uri: "/test")
     private var testResponse = SampleStruct()
-    @Stub
-    private lazy var testStub = ServerStub(uri: "/test", returning: self.testResponse)
+    
+    @Stub(uri: "/test2")
+    private var elo = "modro"
     
     @Test("ConstructorMockServer returns JSON body and 200")
     func testConstructorMockServer() async throws {
-        let request = URLRequest(url: server.baseURL.appending(path: "test"))
+        let request = URLRequest(url: mordo.baseURL.appending(path: "test"))
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         let httpResponse = try #require(response as? HTTPURLResponse)
-        let expected = try JSONEncoder().encode(testResponse)
-        #expect(data == expected)
+        let returned = try JSONDecoder().decode(SampleStruct.self, from: data)
+        #expect(returned == testResponse)
+        #expect(httpResponse.statusCode == 200)
+    }
+
+    @Test("ConstructorMockServer returns JSON body and 200")
+    func testConstructorMockServer2() async throws {
+        let request = URLRequest(url: mordo.baseURL.appending(path: "test2"))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        let returned = String(decoding: data, as: UTF8.self)
+        #expect(returned == elo)
         #expect(httpResponse.statusCode == 200)
     }
 }

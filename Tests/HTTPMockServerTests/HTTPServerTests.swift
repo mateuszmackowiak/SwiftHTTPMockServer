@@ -18,11 +18,11 @@ final class HTTPServerTests {
     }
     
     private let location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
-    private lazy var stub = TestLocationServerStub(location)
     
     @Stub
     private lazy var stubs = [ServerStub.requestBearerAuthorizationValidator, .requestContentTypeValidator, stub]
-    private lazy var url = server.baseURL.appending(path: "testHTTPServerTests")
+    private lazy var stub = TestLocationServerStub(location)
+    private lazy var url = _server.baseURL.appending(path: "testHTTPServerTests")
     
     @Test("GET succeeds with valid headers and body matches expected JSON")
     func testSimpleSuccess() async throws {
@@ -127,8 +127,8 @@ extension ServerStub {
     }
 }
 
-fileprivate class TestLocationServerStub: ServerStub, @unchecked Sendable {
-    public init(_ location: (latitude: Double, longitude: Double)) {
+class TestLocationServerStub: ServerStub, @unchecked Sendable {
+    init(_ location: (latitude: Double, longitude: Double)) {
         super.init(matchingRequest: {
             $0.method == .GET && $0.uri == "/testHTTPServerTests"
         }, handler: { _ in
@@ -144,17 +144,13 @@ fileprivate class TestLocationServerStub: ServerStub, @unchecked Sendable {
     }
 }
 
-import Foundation
-import Testing
-import HTTPMockServer
-
-struct SampleStruct: Encodable {
-    let sample: String = UUID().uuidString
-    let data: Date = Date()
-}
-
 @Suite
 final class Tests {
+    struct SampleStruct: Encodable {
+        let sample: String = UUID().uuidString
+        let data: Date = Date()
+    }
+    
     private lazy var testResponse = SampleStruct()
     private lazy var testStub = ServerStub(uri: "/test", returning: self.testResponse)
 
@@ -169,7 +165,7 @@ final class Tests {
     }
 
     func testConstructorMockServer() async throws {
-        let request = URLRequest(url: URL(string: "http://localhost:\(server.port)/test")!)
+        let request = URLRequest(url: server.baseURL)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

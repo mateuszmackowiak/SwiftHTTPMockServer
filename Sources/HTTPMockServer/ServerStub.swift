@@ -6,7 +6,7 @@
 import Foundation
 import NIOHTTP1
 
-public struct ResponseError: Encodable, Hashable {
+public struct ResponseError: Codable, Hashable, Sendable {
     public let code: String?
     public let message: String
 
@@ -93,7 +93,7 @@ public extension ServerStub {
     }
 
     convenience init(matchingRequest: @Sendable @escaping (HTTPRequest) -> Bool,
-                     failing statusCode: @Sendable @escaping @autoclosure () -> HTTPResponseStatus,
+                     statusCode: @Sendable @escaping @autoclosure () -> HTTPResponseStatus,
                      responseError: @Sendable @escaping @autoclosure () -> ResponseError = ResponseError(code: UUID().uuidString, message: UUID().uuidString)) {
         self.init(matchingRequest: matchingRequest,
                   handler: { _ in .failure(statusCode: statusCode(), response: responseError()) })

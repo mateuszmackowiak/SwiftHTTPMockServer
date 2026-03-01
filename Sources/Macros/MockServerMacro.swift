@@ -1,123 +1,61 @@
-import SwiftCompilerPlugin
+import Foundation
 import SwiftSyntax
-import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
 public struct MockServerMacro: MemberMacro {
-
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        var collectedStubExprs: [ExprSyntax] = []
 
-        outerLoop: for member in declaration.memberBlock.members {
-                guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { continue }
-                
-                let hasStubAttribute = varDecl.attributes.contains { attr in
+        let arguments = node.arguments?.as(LabeledExprListSyntax.self)
+        let serverPropertyName = (arguments?.first(where: { $0.label?.text == "serverPropertyName" })?.expression.description.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))) ?? "_server"
+
+        var expansions: [ServerStubMemberMacro.StructuredExpansion] = []
+        for member in declaration.memberBlock.members {
+            if let funcDecl = member.decl.as(FunctionDeclSyntax.self) {
+                try funcDecl.attributes.forEach { attr in
+
                     guard let attribute = attr.as(AttributeSyntax.self),
-                          let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) else { return false }
-                    
-                    return identifier.name.text == "Stub"
-                }
-                if !hasStubAttribute { continue }
-                
-                for binding in varDecl.bindings {
-                    guard let pattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
-                        continue
+                          let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self),
+                          identifier.name.text == "Stub" else {
+                        return
                     }
-                    let varName = pattern.identifier.text
-                    
-                    if let typeAnno = binding.typeAnnotation?.type {
-                        let typeName = typeAnno.trimmedDescription
-
-                        let isServerStub = typeName.contains("ServerStub")
-                        let isArrayOfStubs = typeName.contains("[") && typeName.contains("ServerStub")
-                        
-                        if isArrayOfStubs {
-                            collectedStubExprs.append("\(raw: varName)")
-                        } else if isServerStub {
-                            collectedStubExprs.append("[\(raw: varName)]")
+                    if let mordo = try ServerStubMemberMacro.structuredExpansion(generate: true, of: attribute, providingPeersOf: member.decl, in: context) {
+                        expansions.append(mordo)
+                    }
+                }
+            }
+                if let varDecl = member.decl.as(VariableDeclSyntax.self) {
+                    try varDecl.attributes.forEach { attr in
+                        guard let attribute = attr.as(AttributeSyntax.self),
+                              let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self),
+                              identifier.name.text == "Stub" else {
+                            return
                         }
-                        
-                    } else {
-                        if let initializer = binding.initializer {
-                            if let callExpr = initializer.value.as(FunctionCallExprSyntax.self),
-                               let identifier = callExpr.calledExpression.as(DeclReferenceExprSyntax.self) {
-                                let typeName = identifier.baseName.text
-                                
-                                let isServerStub = typeName.contains("ServerStub")
-                                let isArrayOfStubs = typeName.contains("[") && typeName.contains("ServerStub")
-                                
-                                if isArrayOfStubs {
-                                    collectedStubExprs.append("\(raw: varName)")
-                                } else if isServerStub {
-                                    collectedStubExprs.append("[\(raw: varName)]")
-                                }
-                                
-                            } else if let memberAccess = initializer.value.as(MemberAccessExprSyntax.self),
-                               let base = memberAccess.base?.as(DeclReferenceExprSyntax.self) {
-                                let typeName = base.baseName.text
-                                
-                                let isServerStub = typeName.contains("ServerStub")
-                                let isArrayOfStubs = typeName.contains("[") && typeName.contains("ServerStub")
-                                
-                                if isArrayOfStubs {
-                                    collectedStubExprs.append("\(raw: varName)")
-                                } else if isServerStub {
-                                    collectedStubExprs.append("[\(raw: varName)]")
-                                }
-                            } else if let arrayExpr = initializer.value.as(ArrayExprSyntax.self) {
-                                for element in arrayExpr.elements {
-                                    if let memberAccess = element.expression.as(MemberAccessExprSyntax.self) {
-                                        
-                                        if let baseExpr = memberAccess.base?.as(DeclReferenceExprSyntax.self) {
-                                            let baseTypeName = baseExpr.baseName.text
-                                            
-                                            if baseTypeName == "ServerStub" {
-                                                let varName = pattern.identifier.text
-                                                collectedStubExprs.append("\(raw: varName)")
-                                                
-                                            }
-                                        }
-                                    }
-                                    let expression = element.expression
-                                    
-                                    if let call = expression.as(FunctionCallExprSyntax.self),
-                                       let typeName = call.calledExpression.as(DeclReferenceExprSyntax.self)?.baseName.text {
-                                        
-                                        let isServerStub = typeName.contains("ServerStub")
-                                        
-                                        if isServerStub {
-                                            collectedStubExprs.append("\(raw: varName)")
-                                            
-                                        }
-                                    }
-                                }
+                        if identifier.name.text == "Stub" {
+                            if let mordo = try ServerStubMemberMacro.structuredExpansion(generate: true, of: attribute, providingPeersOf: member.decl, in: context) {
+                                expansions.append(mordo)
                             }
                         }
-                            
                     }
-                }
             }
-    
-        var parts: [ExprSyntax] = []
-        parts.append(contentsOf: collectedStubExprs)
+        }
 
+    let collectedStubExprs = expansions.map(\.stubName)
         let combinedStubsExpr: ExprSyntax = {
-            if parts.isEmpty {
-                return ExprSyntax("[stubs]")
+            if collectedStubExprs.isEmpty {
+                return ExprSyntax("[]")
             }
-            var expr = parts[0]
-            for p in parts.dropFirst() {
+            var expr = collectedStubExprs[0]
+            for p in collectedStubExprs.dropFirst() {
                 expr = ExprSyntax("\(expr) + \(p)")
             }
             return expr
         }()
-        
-        let serverPropertyName = "server"
 
+        let additional = expansions.compactMap(\.declaration)
         return [
             DeclSyntax("""
             private lazy var \(raw: serverPropertyName) = MockServer(
@@ -139,6 +77,6 @@ public struct MockServerMacro: MemberMacro {
                 try! \(raw: serverPropertyName).stop()
             }
             """)
-        ]
+        ] + additional
     }
 }
