@@ -6,15 +6,16 @@
 import Foundation
 import NIO
 import NIOHTTP1
+import os
 
 final class StubHandler: ChannelInboundHandler, Sendable {
     typealias InboundIn = HTTPRequest
     typealias InboundOut = HTTPServerResponsePart
-    let logger: Logger?
+    let logger: @Sendable () -> Logger
     let stubs: [ServerStub]
     let unhandledBlock: @Sendable (HTTPRequest) -> Void
 
-    init(stubs: [ServerStub], logger: Logger?, unhandledBlock: @Sendable @escaping (HTTPRequest) -> Void) {
+    init(stubs: [ServerStub], logger: @Sendable @escaping () -> Logger, unhandledBlock: @Sendable @escaping (HTTPRequest) -> Void) {
         self.stubs = stubs
         self.logger = logger
         self.unhandledBlock = unhandledBlock
@@ -27,7 +28,7 @@ final class StubHandler: ChannelInboundHandler, Sendable {
             guard stub.matchingRequest(request), let response = stub.handler(request) else {
                 continue
             }
-            logger?.log("Handling \(request) with \(response)")
+            logger().notice("Handling \(String(describing: request), privacy: .private) with \(String(describing: response), privacy: .private)")
             let responseBodyData: Data
             let status: HTTPResponseStatus
             let responseContentType: String
@@ -70,7 +71,7 @@ final class StubHandler: ChannelInboundHandler, Sendable {
         }
         unhandledBlock(request)
 
-        logger?.log("Unsupported handling of \(request)")
+        logger().warning("Unsupported handling of \(String(describing: request))")
 
         let responseBodyData = try! JSONEncoder().encode(ResponseError(code: "Not found", message: "Not found service for \(request)"))
         var httpHeaders = HTTPHeaders()
@@ -89,42 +90,42 @@ final class StubHandler: ChannelInboundHandler, Sendable {
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        logger?.log("Error caught \(error)")
+        logger().fault("Error caught \(error)")
         context.fireErrorCaught(error)
     }
 
     func channelRegistered(context: ChannelHandlerContext) {
-        logger?.log("Channel registered")
+        logger().debug("Channel registered")
         context.fireChannelRegistered()
     }
 
     func channelUnregistered(context: ChannelHandlerContext) {
-        logger?.log("Channel unregistered")
+        logger().debug("Channel unregistered")
         context.fireChannelUnregistered()
     }
 
     func channelActive(context: ChannelHandlerContext) {
-        logger?.log("Channel active")
+        logger().debug("Channel active")
         context.fireChannelActive()
     }
 
     func channelInactive(context: ChannelHandlerContext) {
-        logger?.log("Channel inactive")
+        logger().debug("Channel inactive")
         context.fireChannelInactive()
     }
 
     func channelReadComplete(context: ChannelHandlerContext) {
-        logger?.log("Channel readComplete")
+        logger().log("Channel readComplete")
         context.fireChannelReadComplete()
     }
 
     func channelWritabilityChanged(context: ChannelHandlerContext) {
-        logger?.log("Channel writabilityChanged \(context.channel.isWritable)")
+        logger().debug("Channel writabilityChanged \(context.channel.isWritable)")
         context.fireChannelWritabilityChanged()
     }
 
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
-        logger?.log("Channel userInboundEventTriggered \(event)")
+        logger().debug("Channel userInboundEventTriggered \(String(describing: event))")
         context.fireUserInboundEventTriggered(event)
     }
 }

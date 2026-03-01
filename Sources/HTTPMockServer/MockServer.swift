@@ -5,20 +5,21 @@
 
 import Foundation
 import NIO
+import os
 
 public final class MockServer {
     public final class Configuration {
         public var basicStubs: [ServerStub]
-        public var logger: Logger?
+        public var logger: Logger
 
-        public init(basicStubs: [ServerStub] = [], logger: Logger? = PrintLogger()) {
+        public init(basicStubs: [ServerStub] = [], logger: Logger) {
             self.basicStubs = basicStubs
             self.logger = logger
         }
     }
 
     private lazy var group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-    public nonisolated(unsafe) static var configuration = Configuration()
+    public nonisolated(unsafe) static var configuration = Configuration(logger: Logger(subsystem: "com.mat.logger", category: "MockServer"))
 
     public let host: String
     public let port: Int
@@ -31,7 +32,7 @@ public final class MockServer {
     public init(host: String = "127.0.0.1",
                 port: Int = .random(in: 6000...8000),
                 stubs: [ServerStub],
-                unhandledBlock: @Sendable @escaping (HTTPRequest) -> Void = { print("Unhandled \($0)") }) {
+                unhandledBlock: @Sendable @escaping (HTTPRequest) -> Void = { _ in }) {
         self.host = host
         self.port = port
         self.stubs = stubs
@@ -50,7 +51,7 @@ public final class MockServer {
                 return channel.pipeline.addHandlers([
                     HTTPRequestPartDecoder(baseURL: baseURL),
                     StubHandler(stubs: stubs,
-                                logger: Self.configuration.logger,
+                                logger: { Self.configuration.logger },
                                 unhandledBlock: unhandledBlock)])
             }
         }
@@ -61,19 +62,19 @@ public final class MockServer {
     }()
 
     public func start() throws {
-        try DispatchQueue(label: "server." + UUID().uuidString).sync { [serverBootstrap] in
-            Self.configuration.logger?.log("Starting server at \(host):\(port)")
+        try DispatchQueue(label: "server." + UUID().uuidString).sync { [serverBootstrap, baseURL] in
+            Self.configuration.logger.log("Starting server at \(baseURL)")
             _ = try serverBootstrap.bind(host: host, port: port).wait()
         }
     }
     
     public func start() async throws {
-        Self.configuration.logger?.log("Starting server at \(host):\(port)")
+        Self.configuration.logger.log("Starting server at \(self.baseURL)")
         _ = try await serverBootstrap.bind(host: host, port: port).get()
     }
 
     public func stop() throws {
         try group.syncShutdownGracefully()
-        Self.configuration.logger?.log("Stoped server at \(host):\(port)")
+        Self.configuration.logger.log("Stoped server at \(self.baseURL)")
     }
 }

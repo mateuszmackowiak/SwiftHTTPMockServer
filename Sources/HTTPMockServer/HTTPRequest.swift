@@ -13,11 +13,11 @@ public typealias HTTPVersion = NIOHTTP1.HTTPVersion
 
 public struct HTTPRequest {
     public let method: HTTPMethod
+    public let baseURL: URL
     public let uri: String
     public let version: HTTPVersion
     public let headers: HTTPHeaders
     public let body: HTTPBody
-    public let baseURL: URL
 
     public init(method: HTTPMethod, uri: String, version: HTTPVersion, headers: HTTPHeaders, body: HTTPBody, baseURL: URL) {
         self.method = method
