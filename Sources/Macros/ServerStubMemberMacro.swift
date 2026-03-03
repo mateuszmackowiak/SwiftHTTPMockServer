@@ -163,7 +163,7 @@ public struct ServerStubMemberMacro: PeerMacro {
         else {
             context.diagnose(
                 Diagnostic(node: Syntax(functionType.parameters),
-                           message: SimpleError(message: "Stub must accept exactly one HTTPRequest parameter."))
+                           message: SimpleDiagnosticsMessage(message: "Stub must accept exactly one HTTPRequest parameter."))
             )
             return nil
         }
@@ -176,7 +176,7 @@ public struct ServerStubMemberMacro: PeerMacro {
         else {
             context.diagnose(
                 Diagnostic(node: Syntax(functionType.returnClause),
-                           message: SimpleError(message: "Stub must return ServerStub.Response?."))
+                           message: SimpleDiagnosticsMessage(message: "Stub must return ServerStub.Response?."))
             )
             return nil
         }
@@ -196,15 +196,7 @@ public struct ServerStubMemberMacro: PeerMacro {
     }
 
 
-    struct SimpleError: DiagnosticMessage {
-        let message: String
 
-        var diagnosticID: MessageID {
-            MessageID(domain: "StubMacro", id: message)
-        }
-
-        var severity: DiagnosticSeverity { .error }
-    }
 
 
     private static func serverStubVariableExpansion(varName: String,

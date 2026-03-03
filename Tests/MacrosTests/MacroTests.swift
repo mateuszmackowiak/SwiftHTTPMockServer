@@ -280,7 +280,63 @@ struct MockServerMacroTests {
             macros: testMacros
         )
     }
-    
+
+    @Test
+    func testStubWithBlockMockServerXCMacroExpansion() {
+        assertMacroExpansion(
+            """
+            @MockServer
+            class MyTests: XCTestCase {
+                @Stub(uri: "/")
+                private let block: @Sendable (HTTPRequest) -> ServerStub.Response? = {
+                    guard let authorizationHeader = ($0.headers["Authorization"].first ?? $0.headers["authorization"].first),
+                          authorizationHeader.hasPrefix("Bearer ") else {
+                        return .failure(statusCode: .forbidden, responseError: ResponseError(code: "Missing Authorisation Bearer header", message: "Missing Authorisation Bearer header in \\($0)"))
+                    }
+                }
+            }
+            """,
+            expandedSource: """
+            class MyTests: XCTestCase {
+                private let block: @Sendable (HTTPRequest) -> ServerStub.Response? = {
+                    guard let authorizationHeader = ($0.headers["Authorization"].first ?? $0.headers["authorization"].first),
+                          authorizationHeader.hasPrefix("Bearer ") else {
+                        return .failure(statusCode: .forbidden, responseError: ResponseError(code: "Missing Authorisation Bearer header", message: "Missing Authorisation Bearer header in \\($0)"))
+                    }
+                }
+            
+                private lazy var _server = MockServer(
+                    stubs: [_blockStub()],
+                    unhandledBlock: { request in
+                        Issue.record("Unhandled request \\(request)")
+                    }
+                )
+            
+                override func setUpWithError() throws {
+                    try super.setUpWithError()
+                    try _server.start()
+                }
+
+                override func tearDownWithError() throws {
+                    try super.tearDownWithError()
+                    try _server.stop()
+                }
+            
+                private func _blockStub() -> ServerStub {
+                    let resp = self.block
+                    return ServerStub(
+                        matchingRequest: {
+                            $0.uri == "/"
+                        },
+                        handler: resp
+                    )
+                }
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
     @Test
     func testStubWithFuncMockServerMacroExpansion() {
         assertMacroExpansion(
