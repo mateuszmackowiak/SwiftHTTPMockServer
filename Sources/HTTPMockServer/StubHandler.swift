@@ -50,10 +50,10 @@ final class StubHandler: ChannelInboundHandler, Sendable {
                     httpHeaders.add(name: $0.key, value: $0.value)
                 }
             }
-            stub.history.append(response)
+            stub.appendToHistory(response)
 
-            httpHeaders.add(name: "Content-Length", value: "\(responseBodyData.count)")
-            httpHeaders.add(name: "Content-Type", value: responseContentType)
+            httpHeaders.replaceOrAdd(name: "Content-Length", value: "\(responseBodyData.count)")
+            httpHeaders.replaceOrAdd(name: "Content-Type", value: responseContentType)
 
             let responseHead = HTTPResponseHead(version: request.version, status: status, headers: httpHeaders)
             context.writeAndFlush(wrapInboundOut(HTTPServerResponsePart.head(responseHead)), promise: nil)
@@ -73,10 +73,10 @@ final class StubHandler: ChannelInboundHandler, Sendable {
 
         logger().warning("Unsupported handling of \(String(describing: request))")
 
-        let responseBodyData = try! JSONEncoder().encode(ResponseError(code: "Not found", message: "Not found service for \(request)"))
+        let responseBodyData = (try? JSONEncoder().encode(ResponseError(code: "Not found", message: "Not found service for \(request)"))) ?? Data()
         var httpHeaders = HTTPHeaders()
-        httpHeaders.add(name: "Content-Length", value: "\(responseBodyData.count)")
-        httpHeaders.add(name: "Content-Type", value: "application/json")
+        httpHeaders.replaceOrAdd(name: "Content-Length", value: "\(responseBodyData.count)")
+        httpHeaders.replaceOrAdd(name: "Content-Type", value: "application/json")
         let responseHead = HTTPResponseHead(version: .init(major: 1, minor: 1), status: .notFound, headers: httpHeaders)
         context.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
         var buffer = context.channel.allocator.buffer(capacity: responseBodyData.count)

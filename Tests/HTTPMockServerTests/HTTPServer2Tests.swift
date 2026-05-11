@@ -24,7 +24,7 @@ final class HTTPServer2Tests {
     }
     
     @Stub
-    private static func requestContentTypeValidaton(_ request: HTTPRequest) -> ServerStub.Response? {
+    private static func requestContentTypeValidation(_ request: HTTPRequest) -> ServerStub.Response? {
         if let header = request.headers["Content-Type"].first {
             for supportedType in ["application/json", "multipart/form-data"] {
                 if header.hasPrefix(supportedType) {

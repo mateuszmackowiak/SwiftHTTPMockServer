@@ -17,10 +17,15 @@ public struct ResponseError: Codable, Hashable, Sendable {
 }
 
 open class ServerStub: @unchecked Sendable {
-    internal var history = [Response]()
-    
+    private let _historyLock = NSLock()
+    private var _history = [Response]()
+
     public var responseHistory: [Response] {
-        history
+        _historyLock.withLock { _history }
+    }
+
+    internal func appendToHistory(_ response: Response) {
+        _historyLock.withLock { _history.append(response) }
     }
 
     public enum Response: Hashable, Sendable {

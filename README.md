@@ -1,9 +1,7 @@
 # Swift HTTPMockServer
-[![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-orange.svg)](https://swift.org/package-manager/) [![Swift](https://img.shields.io/badge/Swift-5.5%2B-orange.svg)](https://swift.org) [![iOS](https://img.shields.io/badge/iOS-12%2B-blue.svg)](https://developer.apple.com/ios/) [![macOS](https://img.shields.io/badge/macOS-11%2B-blue.svg)](https://developer.apple.com/macos/) [![SwiftNIO](https://img.shields.io/badge/Powered%20by-SwiftNIO-9cf.svg)](https://github.com/apple/swift-nio)
+[![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-orange.svg)](https://swift.org/package-manager/) [![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange.svg)](https://swift.org) [![iOS](https://img.shields.io/badge/iOS-15%2B-blue.svg)](https://developer.apple.com/ios/) [![macOS](https://img.shields.io/badge/macOS-13%2B-blue.svg)](https://developer.apple.com/macos/) [![SwiftNIO](https://img.shields.io/badge/Powered%20by-SwiftNIO-9cf.svg)](https://github.com/apple/swift-nio)
 
 Swift-nio based server for mocking
-
-[![iOS](https://img.shields.io/badge/iOS->12.0-green.svg)](https://developer.apple.com/ios/)
 
 Lightweight local HTTP server built on SwiftNIO for deterministic API testing — especially UI tests. Simulate network responses in pure Swift by pointing your app to http://localhost:<port>. No external proxies, VPNs, or backend changes. Works with XCTest and the modern Swift Testing framework.
 
@@ -14,7 +12,7 @@ UI tests in pure Swift:
 - Fail fast on unhandled requests to catch unexpected traffic.
 
 
-##UI Tests
+## UI Tests
 
 ```swift
   let stub = ServerStub(uri: "/hello", returning: ["ok": true])
@@ -28,7 +26,7 @@ UI tests in pure Swift:
 ```
 
 
-##Unit Test
+## Unit Test
 ```swift
 struct SampleStruct: Encodable {
     let sample: String = UUID().uuidString

@@ -11,22 +11,13 @@ final class HTTPRequestPartDecoder: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = HTTPServerRequestPart
     typealias InboundOut = HTTPRequest
 
-    /// Tracks current HTTP server state
+    /// Tracks current HTTP server state.
+    /// Modified only on a single EventLoop, so @unchecked Sendable is safe.
     enum RequestState {
-        /// Waiting for request headers
         case ready
-        /// Waiting for the body
-        /// This allows for performance optimization incase
-        /// a body never comes
-        case awaitingBody(HTTPRequestHead)
-        // first chunk
-        case awaitingEnd(HTTPRequestHead, ByteBuffer)
-        /// Collecting streaming body
-        case streamingBody(HTTPBody.Stream)
+        case collecting(HTTPRequestHead, ByteBuffer?)
     }
 
-    /// Current HTTP state.
-    /// Modified only with a single EventLoop so @unchecked is fine :)
     private(set) var requestState: RequestState
 
     let baseURL: URL
@@ -42,32 +33,31 @@ final class HTTPRequestPartDecoder: ChannelInboundHandler, @unchecked Sendable {
         switch part {
         case .head(let head):
             switch requestState {
-            case .ready: requestState = .awaitingBody(head)
-            default: assertionFailure("Unexpected state: \(self.requestState)")
+            case .ready:
+                requestState = .collecting(head, nil)
+            case .collecting:
+                assertionFailure("Unexpected state: \(self.requestState)")
             }
-        case .body(let chunk):
+        case .body(var chunk):
             switch requestState {
-            case .ready: assertionFailure("Unexpected state: \(self.requestState)")
-            case .awaitingBody(let head):
-                requestState = .awaitingEnd(head, chunk)
-            case .awaitingEnd(let head, let bodyStart):
-                let stream = HTTPBody.Stream(on: context.channel.eventLoop)
-                requestState = .streamingBody(stream)
-                fireRequestRead(head: head, body: .init(stream: stream), context: context)
-                stream.write(.chunk(bodyStart))
-                stream.write(.chunk(chunk))
-            case .streamingBody(let stream):
-                stream.write(.chunk(chunk))
+            case .ready:
+                assertionFailure("Unexpected state: \(self.requestState)")
+            case .collecting(let head, var buffer):
+                if buffer != nil {
+                    buffer!.writeBuffer(&chunk)
+                    requestState = .collecting(head, buffer)
+                } else {
+                    requestState = .collecting(head, chunk)
+                }
             }
         case .end(let tailHeaders):
             assert(tailHeaders == nil, "Tail headers are not supported.")
             switch requestState {
-            case .ready: assertionFailure("Unexpected state: \(self.requestState)")
-            case .awaitingBody(let head):
-                fireRequestRead(head: head, body: .empty, context: context)
-            case .awaitingEnd(let head, let chunk):
-                fireRequestRead(head: head, body: .init(buffer: chunk), context: context)
-            case .streamingBody(let stream): stream.write(.end)
+            case .ready:
+                assertionFailure("Unexpected state: \(self.requestState)")
+            case .collecting(let head, let buffer):
+                let body: HTTPBody = buffer.map { HTTPBody(buffer: $0) } ?? .empty
+                fireRequestRead(head: head, body: body, context: context)
             }
             requestState = .ready
         }
