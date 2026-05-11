@@ -43,11 +43,84 @@ public extension ServerStub {
                   timeout: timeout)
     }
 
+    /// Forwards requests whose `Host` header begins with `subdomain.` to `targetBaseURL`.
+    ///
+    /// Use when the client targets per-service subdomains of `.localhost` (e.g. `auth.localhost:4444`)
+    /// and you want each subdomain proxied to a different real backend. Port in the Host header is ignored.
+    /// Pass `""` to match hosts with no subdomain (single-label hosts like `localhost:4444`).
+    convenience init(subdomain: String,
+                     forwardingTo targetBaseURL: URL,
+                     urlSession: URLSession = .shared,
+                     timeout: TimeInterval = 30) {
+        self.init(forwardingBySubdomain: [subdomain: targetBaseURL],
+                  urlSession: urlSession,
+                  timeout: timeout)
+    }
+
+    /// Forwards requests by subdomain — matches the leading label of the `Host` header against the
+    /// dictionary keys and proxies to the mapped URL. Use to consolidate many per-service forwarding
+    /// stubs into a single declaration. Port in the Host header is ignored; keys are case-insensitive.
+    /// Use `""` as a key to match hosts with no subdomain (single-label hosts like `localhost:4444`).
+    convenience init(forwardingBySubdomain: [String: URL],
+                     urlSession: URLSession = .shared,
+                     timeout: TimeInterval = 30) {
+        let routing = Dictionary(uniqueKeysWithValues: forwardingBySubdomain.map { ($0.key.lowercased(), $0.value) })
+        @Sendable func leadingLabel(_ request: HTTPRequest) -> String? {
+            guard let hostHeader = request.headers.first(name: "host") else { return nil }
+            let hostOnly = hostHeader.split(separator: ":").first.map(String.init) ?? hostHeader
+            let labels = hostOnly.split(separator: ".")
+            guard !labels.isEmpty else { return nil }
+            if labels.count == 1 { return "" }
+            return String(labels[0]).lowercased()
+        }
+        self.init(matchingRequest: { request in
+            guard let label = leadingLabel(request) else { return false }
+            return routing[label] != nil
+        },
+                  handler: ServerStub.makeForwardingHandler(targetBaseURLFor: { request in
+            leadingLabel(request).flatMap { routing[$0] }
+        }, urlSession: urlSession, timeout: timeout))
+    }
+
+    /// Forwards requests whose `uri` path starts with `pathPrefix` to `targetBaseURL`, stripping the prefix before forwarding.
+    ///
+    /// Use this when the client points to a single localhost host with a synthetic path prefix per upstream service
+    /// and you want each prefix to be proxied to a different real backend.
+    convenience init(pathPrefix: String,
+                     forwardingTo targetBaseURL: URL,
+                     urlSession: URLSession = .shared,
+                     timeout: TimeInterval = 30) {
+        let normalizedPrefix = pathPrefix.hasPrefix("/") ? pathPrefix : "/" + pathPrefix
+        self.init(matchingRequest: { request in
+            let path = requestPath(request.uri)
+            guard path.hasPrefix(normalizedPrefix) else { return false }
+            let remainder = path.dropFirst(normalizedPrefix.count)
+            return remainder.isEmpty || remainder.hasPrefix("/")
+        },
+                  handler: ServerStub.makeForwardingHandler(targetBaseURL: targetBaseURL,
+                                                            stripPathPrefix: normalizedPrefix,
+                                                            urlSession: urlSession,
+                                                            timeout: timeout))
+    }
+
     private static func makeForwardingHandler(targetBaseURL: URL,
+                                              stripPathPrefix: String? = nil,
+                                              urlSession: URLSession,
+                                              timeout: TimeInterval) -> @Sendable (HTTPRequest) -> Response? {
+        makeForwardingHandler(targetBaseURLFor: { _ in targetBaseURL },
+                              stripPathPrefix: stripPathPrefix,
+                              urlSession: urlSession,
+                              timeout: timeout)
+    }
+
+    private static func makeForwardingHandler(targetBaseURLFor: @Sendable @escaping (HTTPRequest) -> URL?,
+                                              stripPathPrefix: String? = nil,
                                               urlSession: URLSession,
                                               timeout: TimeInterval) -> @Sendable (HTTPRequest) -> Response? {
         return { request in
-            guard let forwardURL = combine(targetBaseURL: targetBaseURL, requestURI: request.uri) else {
+            guard let targetBaseURL = targetBaseURLFor(request) else { return nil }
+            let effectiveURI = stripPathPrefix.map { stripPrefix($0, from: request.uri) } ?? request.uri
+            guard let forwardURL = combine(targetBaseURL: targetBaseURL, requestURI: effectiveURI) else {
                 return .failure(statusCode: .badGateway,
                                 responseError: ResponseError(code: "ForwardingStub_InvalidURL",
                                                              message: "Cannot build forward URL from \(targetBaseURL) + \(request.uri)"))
@@ -130,6 +203,21 @@ private let hopByHopHeaders: Set<String> = [
     "trailer",
     "host"
 ]
+
+private func requestPath(_ uri: String) -> String {
+    URLComponents(string: uri)?.path ?? uri
+}
+
+private func stripPrefix(_ prefix: String, from uri: String) -> String {
+    guard var components = URLComponents(string: uri) else {
+        return uri.hasPrefix(prefix) ? String(uri.dropFirst(prefix.count)) : uri
+    }
+    let path = components.path
+    guard path.hasPrefix(prefix) else { return uri }
+    let stripped = String(path.dropFirst(prefix.count))
+    components.path = stripped.hasPrefix("/") ? stripped : "/" + stripped
+    return components.string ?? uri
+}
 
 private func combine(targetBaseURL: URL, requestURI: String) -> URL? {
     guard var targetComponents = URLComponents(url: targetBaseURL, resolvingAgainstBaseURL: false) else {

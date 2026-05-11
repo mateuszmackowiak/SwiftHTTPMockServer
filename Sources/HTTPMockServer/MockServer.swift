@@ -7,8 +7,8 @@ import Foundation
 import NIO
 import os
 
-public final class MockServer {
-    public final class Configuration {
+public final class MockServer: @unchecked Sendable {
+    public final class Configuration: @unchecked Sendable {
         public var basicStubs: [ServerStub]
         public var logger: Logger
 
