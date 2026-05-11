@@ -13,7 +13,7 @@ let package = Package(
     products: [ .library(name: "HTTPMockServer", targets: ["HTTPMockServer"]) ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio", from: "2.59.0"),
-        .package(url: "https://github.com/apple/swift-syntax", from: "509.0.0")
+        .package(url: "https://github.com/swiftlang/swift-syntax", from: "603.0.1")
     ],
     targets: [
         .macro(
