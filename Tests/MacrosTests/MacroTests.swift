@@ -228,6 +228,98 @@ struct MockServerMacroTests {
         )
     }
     @Test
+    func testStubWithServerStubResponseMacroExpansion() {
+        assertMacroExpansion(
+            """
+            @MockServer
+            class MyTests {
+                @Stub(uri: "/api/v3/account/details.json")
+                let errorResponse = ServerStub.Response.failure(statusCode: .locked, responseBody: Data("error".utf8))
+            }
+            """,
+            expandedSource: """
+            class MyTests {
+                let errorResponse = ServerStub.Response.failure(statusCode: .locked, responseBody: Data("error".utf8))
+
+                private lazy var _server = MockServer(
+                    stubs: [_errorResponseStub()],
+                    unhandledBlock: { request in
+                        Issue.record("Unhandled request \\(request)")
+                    }
+                )
+
+                init() throws {
+                    try _server.start()
+                }
+
+                deinit {
+                    try! _server.stop()
+                }
+
+                private func _errorResponseStub() -> ServerStub {
+                    let resp = self.errorResponse
+                    return ServerStub(
+                        matchingRequest: {
+                            $0.uri == "/api/v3/account/details.json"
+                        },
+                        handler: { _ in
+                            resp
+                        }
+                    )
+                }
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
+    @Test
+    func testStubWithServerStubResponseTypeAnnotationMacroExpansion() {
+        assertMacroExpansion(
+            """
+            @MockServer
+            class MyTests {
+                @Stub(uri: "/api/v3/account/details.json")
+                let errorResponse: ServerStub.Response = .failure(statusCode: .locked, responseBody: Data("error".utf8))
+            }
+            """,
+            expandedSource: """
+            class MyTests {
+                let errorResponse: ServerStub.Response = .failure(statusCode: .locked, responseBody: Data("error".utf8))
+
+                private lazy var _server = MockServer(
+                    stubs: [_errorResponseStub()],
+                    unhandledBlock: { request in
+                        Issue.record("Unhandled request \\(request)")
+                    }
+                )
+
+                init() throws {
+                    try _server.start()
+                }
+
+                deinit {
+                    try! _server.stop()
+                }
+
+                private func _errorResponseStub() -> ServerStub {
+                    let resp = self.errorResponse
+                    return ServerStub(
+                        matchingRequest: {
+                            $0.uri == "/api/v3/account/details.json"
+                        },
+                        handler: { _ in
+                            resp
+                        }
+                    )
+                }
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
+    @Test
     func testStubWithBlockMockServerMacroExpansion() {
         assertMacroExpansion(
             """

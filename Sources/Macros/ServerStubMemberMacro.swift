@@ -209,6 +209,9 @@ public struct ServerStubMemberMacro: PeerMacro {
             return expansion
         }
         if let typeAnnotation = binding.typeAnnotation?.type {
+            if typeIsServerStubResponse(typeAnnotation) {
+                return serverStubResponseExpansion(varName: varName, validationExpresion: validationExpresion)
+            }
             let typeDescription = typeAnnotation.description
             if typeDescription.contains("ServerStub") {
                 return .singleStub(stubName: ExprSyntax("\(raw: varName)"))
@@ -216,6 +219,9 @@ public struct ServerStubMemberMacro: PeerMacro {
         }
         guard let initializer = binding.initializer else {
             return nil
+        }
+        if isExpressionServerStubResponse(initializer.value) {
+            return serverStubResponseExpansion(varName: varName, validationExpresion: validationExpresion)
         }
         guard let arrayExpr = initializer.value.as(ArrayExprSyntax.self) else {
             if isExpressionServerStub(initializer.value) {
@@ -228,6 +234,53 @@ public struct ServerStubMemberMacro: PeerMacro {
             return .collectionStub(stubName: ExprSyntax("\(raw: varName)"))
         }
         return nil
+    }
+
+    private static func serverStubResponseExpansion(varName: String,
+                                                    validationExpresion: ExprSyntax) -> StructuredExpansion {
+        let stubName = ExprSyntax("_\(raw: varName)Stub()")
+        return StructuredExpansion(stubName: stubName,
+                                   declaration: DeclSyntax(
+                """
+                private func \(stubName) -> ServerStub {
+                    let resp = self.\(raw: varName)
+                    return ServerStub(
+                        matchingRequest: \(validationExpresion),
+                        handler: { _ in
+                            resp
+                        }
+                    )
+                }
+                """
+                                   ))
+    }
+
+    private static func typeIsServerStubResponse(_ type: TypeSyntax) -> Bool {
+        if let attributed = type.as(AttributedTypeSyntax.self) {
+            return typeIsServerStubResponse(attributed.baseType)
+        }
+        if let optional = type.as(OptionalTypeSyntax.self) {
+            return typeIsServerStubResponse(optional.wrappedType)
+        }
+        if let member = type.as(MemberTypeSyntax.self) {
+            let base = member.baseType.as(IdentifierTypeSyntax.self)?.name.text
+            return base == "ServerStub" && member.name.text == "Response"
+        }
+        return false
+    }
+
+    private static func isExpressionServerStubResponse(_ expr: ExprSyntax) -> Bool {
+        if let functionCall = expr.as(FunctionCallExprSyntax.self) {
+            return isExpressionServerStubResponse(functionCall.calledExpression)
+        }
+        if let memberAccess = expr.as(MemberAccessExprSyntax.self),
+           let baseMember = memberAccess.base?.as(MemberAccessExprSyntax.self),
+           let baseBase = baseMember.base?.as(DeclReferenceExprSyntax.self),
+           baseBase.baseName.text == "ServerStub",
+           baseMember.declName.baseName.text == "Response" {
+            return true
+        }
+        return false
     }
 
     private static func isExpressionServerStub(_ expr: ExprSyntax) -> Bool {

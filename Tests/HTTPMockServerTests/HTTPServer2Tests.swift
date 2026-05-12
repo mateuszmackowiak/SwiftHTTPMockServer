@@ -13,7 +13,10 @@ import HTTPMockServer
 @MockServer
 final class HTTPServer2Tests {
     private let location = (latitude: Double.random(in: -90...90), longitude: Double.random(in: -180...180))
-        
+    
+    @Stub(uri: "/testHTTPServerTests/lockedResponse")
+    let lockedResponse = ServerStub.Response.failure(statusCode: .locked, responseBody: Data(#"""{ "error": "some message" }"""#.utf8))
+    
     @Stub
     private let requestBearerAuthorizationValidation: @Sendable (HTTPRequest) -> ServerStub.Response? = {
         guard let authorizationHeader = ($0.headers["Authorization"].first ?? $0.headers["authorization"].first),
@@ -103,6 +106,18 @@ final class HTTPServer2Tests {
         #expect(data == expectedData)
         let httpResponse = try #require(response as? HTTPURLResponse)
         #expect(httpResponse.statusCode == 200)
+    }
+    
+    @Test("423")
+    func testLockedResponse() async throws {
+        var request = URLRequest(url: url.appendingPathComponent("lockedResponse"))
+        request.allHTTPHeaderFields = ["authorization": "Bearer \(UUID().uuidString)", "Content-Type": "application/json"]
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let expectedData = Data( #"""{ "error": "some message" }"""#.utf8)
+        #expect(data == expectedData)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 423)
     }
 }
 
