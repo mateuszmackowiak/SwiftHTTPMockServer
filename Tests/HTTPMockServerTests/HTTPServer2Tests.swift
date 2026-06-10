@@ -16,7 +16,10 @@ final class HTTPServer2Tests {
     
     @Stub(uri: "/testHTTPServerTests/lockedResponse")
     let lockedResponse = ServerStub.Response.failure(statusCode: .locked, responseBody: Data(#"""{ "error": "some message" }"""#.utf8))
-    
+
+    @Stub(uri: "/testHTTPServerTests/someRandomPath/*")
+    let someRandomResponse = ServerStub.Response.failure(statusCode: .created, responseBody: Data(#"""{ "jeah": "some random message" }"""#.utf8))
+
     @Stub
     private let requestBearerAuthorizationValidation: @Sendable (HTTPRequest) -> ServerStub.Response? = {
         guard let authorizationHeader = ($0.headers["Authorization"].first ?? $0.headers["authorization"].first),
@@ -118,6 +121,18 @@ final class HTTPServer2Tests {
         #expect(data == expectedData)
         let httpResponse = try #require(response as? HTTPURLResponse)
         #expect(httpResponse.statusCode == 423)
+    }
+
+    @Test("someRandomPath/*")
+    func testGenericStubResponse() async throws {
+        var request = URLRequest(url: url.appendingPathComponent("someRandomPath").appendingPathComponent(String(UUID().uuidString.prefix(6))))
+        request.allHTTPHeaderFields = ["authorization": "Bearer \(UUID().uuidString)", "Content-Type": "application/json"]
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let expectedData = Data( #"""{ "jeah": "some random message" }"""#.utf8)
+        #expect(data == expectedData)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 201)
     }
 }
 

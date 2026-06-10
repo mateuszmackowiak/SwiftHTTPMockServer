@@ -88,17 +88,34 @@ public struct ServerStubMemberMacro: PeerMacro {
         guard let uri = arguments?.first(where: { $0.label?.text == "uri" || $0.label == nil })?.expression.description else {
             return ExprSyntax("{ _ in return true }")
         }
-        // If uri == "*", skip validation entirely
+        // If uri == "*" or "/*", skip validation entirely
         if uri == "\"*\"" || uri == "\"/*\"" || uri == "" {
             return ExprSyntax("{ _ in return true }")
         }
 
-        var validations: [ExprSyntax] = ["$0.uri == \(raw: uri)"]
-
-        if let method = arguments?
+        let methodValidation = arguments?
             .first(where: { $0.label?.text == "method" })?
             .expression
-            .description {
+            .description
+
+        // If uri ends with "/*" (e.g. "/api/*"), match by path prefix
+        if uri.hasSuffix("/*\"") {
+            // Drop opening quote and trailing /*", then re-wrap with a trailing slash
+            let prefix = String(uri.dropFirst(1).dropLast(2))
+            let prefixLiteral = "\"\(prefix)\""
+            var validations: [ExprSyntax] = ["$0.uri.hasPrefix(\(raw: prefixLiteral))"]
+            if let method = methodValidation {
+                validations.append("$0.method == \(raw: method)")
+            }
+            var expr = validations[0]
+            for part in validations.dropFirst() {
+                expr = ExprSyntax("\(expr) && \(part)")
+            }
+            return ExprSyntax("{ \(expr) }")
+        }
+
+        var validations: [ExprSyntax] = ["$0.uri == \(raw: uri)"]
+        if let method = methodValidation {
             validations.append("$0.method == \(raw: method)")
         }
 

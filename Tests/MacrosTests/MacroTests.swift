@@ -169,7 +169,51 @@ struct MockServerMacroTests {
             macros: testMacros
         )
     }
-    
+
+    @Test
+    func testGetStubMockServerMacroExpansionWithGenericUri() {
+        assertMacroExpansion(
+            """
+            @MockServer
+            class MyTests {
+                @Stub(uri: "/test/*")
+                private var testResponse = SampleStruct()
+            }
+            """,
+            expandedSource: """
+            class MyTests {
+                private var testResponse = SampleStruct()
+            
+                private lazy var _server = MockServer(
+                    stubs: [_testResponseStub()],
+                    unhandledBlock: { request in
+                        Issue.record("Unhandled request \\(request)")
+                    }
+                )
+            
+                init() throws {
+                    try _server.start()
+                }
+            
+                deinit {
+                    try! _server.stop()
+                }
+            
+                private func _testResponseStub() -> ServerStub {
+                    let resp = self.testResponse
+                    return ServerStub(
+                        matchingRequest: {
+                            $0.uri.hasPrefix("/test")
+                        },
+                        returning: resp
+                    )
+                }
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
     @Test
     func testGetStubMockServerMacroExpansion2() {
         assertMacroExpansion(

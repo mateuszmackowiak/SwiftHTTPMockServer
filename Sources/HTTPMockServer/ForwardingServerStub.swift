@@ -175,6 +175,9 @@ public extension ServerStub {
                     contentType = valueString
                     continue
                 }
+                if lower == "content-encoding" {
+                    continue
+                }
                 headers[keyString] = valueString
             }
 
