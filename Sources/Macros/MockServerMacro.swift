@@ -68,9 +68,21 @@ public struct MockServerMacro: MemberMacro {
             return typeName == "XCTestCase"
         } ?? false
 
+        let isMainActorIsolated = classDecl.attributes.contains { attribute in
+            attribute.as(AttributeSyntax.self)?
+                .attributeName.as(IdentifierTypeSyntax.self)?.name.text == "MainActor"
+        }
+
         let failureRecording = inheritsFromXCTestCase
         ? "XCTFail(\"Unhandled request \\(request)\")"
         : "Issue.record(\"Unhandled request \\(request)\")"
+
+        // `setUpWithError`/`tearDownWithError` override nonisolated declarations, so they stay
+        // nonisolated even in a @MainActor class - hop back to the main actor to reach the server.
+        let serverCall: (String, String) -> String = { property, method in
+            guard isMainActorIsolated else { return "try \(property).\(method)()" }
+            return "try MockServer._onMainActor(self) { try $0.\(property).\(method)() }"
+        }
 
         let existingMembers = classDecl.memberBlock.members
 
@@ -106,14 +118,14 @@ public struct MockServerMacro: MemberMacro {
                 members.append(DeclSyntax("""
                             override func setUpWithError() throws {
                                 try super.setUpWithError()
-                                try \(raw: serverPropertyName).start()
+                                \(raw: serverCall(serverPropertyName, "start"))
                             }
                             """))
             }
             if !hasTearDown {
                 members.append(DeclSyntax("""
                             override func tearDownWithError() throws {
-                                try \(raw: serverPropertyName).stop()
+                                \(raw: serverCall(serverPropertyName, "stop"))
                                 try super.tearDownWithError()
                             }
                             """))

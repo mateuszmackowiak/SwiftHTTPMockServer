@@ -147,3 +147,20 @@ public final class MockServer: @unchecked Sendable {
         try? group?.syncShutdownGracefully()
     }
 }
+
+extension MockServer {
+    private struct UncheckedBox<Value>: @unchecked Sendable {
+        let value: Value
+    }
+
+    /// Plumbing for the `@MockServer` expansion in `@MainActor` isolated test classes.
+    ///
+    /// `setUpWithError`/`tearDownWithError` override nonisolated declarations, so they stay
+    /// nonisolated even in a `@MainActor` class and cannot reach the isolated server property.
+    /// XCTest calls them on the main thread, so hopping back is safe.
+    public static func _onMainActor<Object>(_ object: Object,
+                                            _ body: @MainActor @Sendable (Object) throws -> Void) rethrows {
+        let box = UncheckedBox(value: object)
+        try MainActor.assumeIsolated { try body(box.value) }
+    }
+}

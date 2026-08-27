@@ -34,7 +34,7 @@ struct MockServerMacroTests {
             expandedSource: """
             class MyTests {
                 var locationStub: TestLocationServerStub = .init()
-                
+
                 var listStubs = [AuthServerStub()]
                 private lazy var stub = TestLocationServerStub()
 
@@ -203,7 +203,7 @@ struct MockServerMacroTests {
                     let resp = self.testResponse
                     return ServerStub(
                         matchingRequest: {
-                            $0.uri.hasPrefix("/test")
+                            $0.uri.hasPrefix("/test/")
                         },
                         returning: resp
                     )
@@ -444,7 +444,7 @@ struct MockServerMacroTests {
                 private lazy var _server = MockServer(
                     stubs: [_blockStub()],
                     unhandledBlock: { request in
-                        Issue.record("Unhandled request \\(request)")
+                        XCTFail("Unhandled request \\(request)")
                     }
                 )
             
@@ -454,8 +454,8 @@ struct MockServerMacroTests {
                 }
 
                 override func tearDownWithError() throws {
-                    try super.tearDownWithError()
                     try _server.stop()
+                    try super.tearDownWithError()
                 }
             
                 private func _blockStub() -> ServerStub {
@@ -526,6 +526,58 @@ struct MockServerMacroTests {
                             return true
                         },
                         handler: Self.requestContentTypeValidaton
+                    )
+                }
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
+    @Test
+    func testMainActorIsolatedXCTestCaseMacroExpansion() {
+        assertMacroExpansion(
+            """
+            @MockServer
+            @MainActor
+            class MyTests: XCTestCase {
+                @Stub(uri: "/test")
+                private var testResponse = SampleStruct()
+            }
+            """,
+            expandedSource: """
+            @MainActor
+            class MyTests: XCTestCase {
+                private var testResponse = SampleStruct()
+
+                private lazy var _server = MockServer(
+                    stubs: [_testResponseStub()],
+                    unhandledBlock: { request in
+                        XCTFail("Unhandled request \\(request)")
+                    }
+                )
+
+                override func setUpWithError() throws {
+                    try super.setUpWithError()
+                    try MockServer._onMainActor(self) {
+                        try $0._server.start()
+                    }
+                }
+
+                override func tearDownWithError() throws {
+                    try MockServer._onMainActor(self) {
+                        try $0._server.stop()
+                    }
+                    try super.tearDownWithError()
+                }
+
+                private func _testResponseStub() -> ServerStub {
+                    let resp = self.testResponse
+                    return ServerStub(
+                        matchingRequest: {
+                            $0.uri == "/test"
+                        },
+                        returning: resp
                     )
                 }
             }
