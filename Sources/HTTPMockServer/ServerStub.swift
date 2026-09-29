@@ -31,6 +31,11 @@ open class ServerStub: @unchecked Sendable {
     public enum Response: Hashable, Sendable {
         case success(responseBody: Data, statusCode: HTTPResponseStatus = .ok, contentType: String = "application/json", headers: [String: String] = [:])
         case failure(statusCode: HTTPResponseStatus, responseBody: Data, headers: [String: String] = [:])
+        /// Closes the connection without sending anything back, so the client gets a transport
+        /// error (`URLError.networkConnectionLost`) instead of an HTTP response. Clients retry an
+        /// idempotent request after a lost connection, so keep returning this for as long as the
+        /// failure is needed — dropping only the first attempt lets the retry succeed.
+        case connectionDropped
 
 
         

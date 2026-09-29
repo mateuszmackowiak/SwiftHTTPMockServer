@@ -29,6 +29,7 @@ final class StubHandler: ChannelInboundHandler, Sendable {
                 continue
             }
             logger().notice("Handling \(String(describing: request), privacy: .private) with \(String(describing: response), privacy: .private)")
+            stub.appendToHistory(response)
             let responseBodyData: Data
             let status: HTTPResponseStatus
             let responseContentType: String
@@ -49,8 +50,10 @@ final class StubHandler: ChannelInboundHandler, Sendable {
                 headers.forEach {
                     httpHeaders.add(name: $0.key, value: $0.value)
                 }
+            case .connectionDropped:
+                context.close(promise: nil)
+                return
             }
-            stub.appendToHistory(response)
 
             httpHeaders.replaceOrAdd(name: "Content-Length", value: "\(responseBodyData.count)")
             httpHeaders.replaceOrAdd(name: "Content-Type", value: responseContentType)
