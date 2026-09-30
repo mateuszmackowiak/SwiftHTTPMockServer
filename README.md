@@ -26,6 +26,31 @@ UI tests in pure Swift:
 ```
 
 
+## Dropped connection
+
+Close the connection without a response to simulate a network failure. The client gets a transport error (`URLError.networkConnectionLost`) rather than an HTTP status — useful for WebViews, which render any HTTP error page instead of failing the navigation.
+
+```swift
+@MockServer
+final class OfflineTests {
+    @Stub(uri: "/some/path")
+    let dropped = ServerStub.Response.connectionDropped
+}
+```
+
+Without the macros:
+
+```swift
+  let dropped = ServerStub(matchingRequest: { $0.uri.hasPrefix("/some/path") },
+                           handler: { _ in .connectionDropped })
+```
+
+- Clients retry an idempotent request after a lost connection (URLSession made three attempts for one GET), so keep dropping for as long as the test needs the failure — dropping only the first attempt lets the retry succeed. `responseHistory` records every attempt, not every client call.
+- To stop dropping mid-test, return `nil` from the handler based on state the test owns; `nil` passes the request on to the next stub.
+- `@Stub(uri:)` compares the raw request target, query string included — use `matchingRequest` for a path that may carry a query.
+- Stubs are tried in declaration order and the first non-`nil` response wins, so declare the drop before a catch-all forwarding stub.
+
+
 ## Unit Test
 ```swift
 struct SampleStruct: Encodable {
